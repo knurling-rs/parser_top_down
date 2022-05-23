@@ -76,7 +76,8 @@ mod tests {
 
     #[test]
     fn empty_string() {
-        assert_eq!(LinkerScript { commands: vec![] }, parse(""));
+        let ls = parse("");
+        assert!(ls.commands.is_empty());
     }
 
     #[test]
@@ -91,25 +92,21 @@ mod tests {
 
     #[test]
     fn two_memory_word_string() {
-        assert_eq!(
-            LinkerScript {
-                commands: vec![
-                    Command::Memory { regions: None },
-                    Command::Memory { regions: None }
-                ]
-            },
-            parse("MEMORY {} MEMORY {}")
-        );
+        let linker_script = parse("MEMORY {} MEMORY {}");
+        assert_eq!(linker_script.commands.len(), 2);
+        // field of enum variant ==> ..
+        assert!(matches!(linker_script.commands[0], Command::Memory { .. }));
+        assert!(matches!(linker_script.commands[1], Command::Memory { .. }));
     }
 
     #[test]
     fn section_string() {
-        assert_eq!(
-            LinkerScript {
-                commands: vec![Command::Sections]
-            },
-            parse("SECTIONS {}")
-        );
+        let linker_script = parse("SECTIONS {}");
+        assert_eq!(linker_script.commands.len(), 1);
+        assert!(matches!(
+            linker_script.commands[0],
+            Command::Sections { .. }
+        ));
     }
 
     #[test]
