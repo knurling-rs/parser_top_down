@@ -83,28 +83,16 @@ fn parse_memory(
                 TokenKind::Word { .. }
             ));
             assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
-            assert!(matches!(
-                it.peek().unwrap().token_kind,
-                TokenKind::Number { .. }
-            ));
-            let origin = match it.next().unwrap().token_kind {
-                TokenKind::Number(o) => o,
-                _ => unreachable!("should be a number"),
-            };
+            let origin = parse_expr(it);
             assert_eq!(it.next().unwrap().token_kind, TokenKind::Comma);
             assert!(matches!(
                 it.next().unwrap().token_kind,
                 TokenKind::Word { .. }
             ));
             assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
-            assert!(matches!(
-                it.peek().unwrap().token_kind,
-                TokenKind::Number { .. }
-            ));
-            let length = match it.next().unwrap().token_kind {
-                TokenKind::Number(l) => l,
-                _ => unreachable!("should be a number"),
-            };
+
+            let length = parse_expr(it);
+
             let region = Region {
                 id: id.to_string(),
                 origin,
@@ -128,6 +116,18 @@ fn parse_memory(
     } else {
         commands.push(Command::Memory { regions: vec![] });
     }
+}
+
+fn parse_expr(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> u64 {
+    assert!(matches!(
+        it.peek().unwrap().token_kind,
+        TokenKind::Number { .. }
+    ));
+    let origin = match it.next().unwrap().token_kind {
+        TokenKind::Number(o) => o,
+        _ => unreachable!("should be a number"),
+    };
+    origin
 }
 //tmod expands!!
 #[cfg(test)]
