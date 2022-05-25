@@ -318,4 +318,37 @@ MEMORY
             expr
         )
     }
+
+    // use .box
+    #[test]
+    fn parse_expr_3() {
+        let tokens: Vec<Token> = vec![
+            Token::test_new(TokenKind::Number(0)),
+            Token::test_new(TokenKind::Plus),
+            Token::test_new(TokenKind::Number(1)),
+            Token::test_new(TokenKind::Plus),
+            Token::test_new(TokenKind::Number(2)),
+        ];
+        let expr = parse_expr(&mut tokens.into_iter().peekable());
+        let expected_exp = Expr {
+            expr_kind: ExprKind::BinExpr(
+                Box::new(Expr {
+                    expr_kind: ExprKind::Number(0),
+                }),
+                Op::Plus,
+                Box::new(Expr {
+                    expr_kind: ExprKind::BinExpr(
+                        Box::new(Expr {
+                            expr_kind: ExprKind::Number(1),
+                        }),
+                        Op::Plus,
+                        Box::new(Expr {
+                            expr_kind: ExprKind::Number(2),
+                        }),
+                    ),
+                }),
+            ),
+        };
+        assert_eq!(expected_exp, expr)
+    }
 }
