@@ -35,6 +35,14 @@ impl Token {
             line_number: 0,
         }
     }
+
+    pub fn test_new(k: TokenKind) -> Self {
+        Token {
+            token_kind: k,
+            span: 0..0,
+            line_number: 0,
+        }
+    }
 }
 pub fn lexer(script: &str) -> Vec<Token> {
     let mut tokens = Vec::new();

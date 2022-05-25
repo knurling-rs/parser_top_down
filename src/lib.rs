@@ -214,7 +214,7 @@ MEMORY
 }
 ",
         );
-        assert_eq!(ls.commands.len(), 1);
+        assert_eq!(1, ls.commands.len());
 
         match ls.commands[0] {
             // Cannot move out an element of the vector
@@ -230,5 +230,12 @@ MEMORY
             }
             Command::Sections => todo!(),
         }
+    }
+    //tfn macro
+    #[test]
+    fn parse_expr_1() {
+        let tokens: Vec<Token> = vec![Token::test_new(TokenKind::Number(0))];
+        let expr = parse_expr(&mut tokens.into_iter().peekable());
+        assert_eq!(0, expr);
     }
 }
