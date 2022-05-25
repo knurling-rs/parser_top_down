@@ -1,0 +1,150 @@
+
+// type Span = Range<usize>;
+
+// struct Token {
+//     kind: TokenKind,
+//     span: Span,
+// }
+
+// enum TokenKind {
+//     Plus,
+//     // ..
+// }
+
+// struct LinkerScript {
+//     commands: Vec<Command>,
+// }
+
+// struct Command {
+//     kind: CommandKind,
+//     span: Span,
+// }
+
+// enum CommandKind {
+//     Memory(Memory), // MEMORY { .. }
+//     //                 ^           ^ span
+//     Sections, // SECTIONS { .. }
+// }
+
+// /*
+// SECTIONS {
+//   _var = 0;
+
+//   .text : var + 1 {
+
+//   } > FLASH
+
+// }
+//  */
+// struct Memory {
+//     span: Span,
+//     regions: Vec<Region>, // FLASH (r w x) ORIGIN = 0, LENGTH = 128
+//                           // ^                                 ^ span
+//                           // ..
+// }
+
+// struct Region {
+//     name: String,
+//     attributes: Attributes,
+//     origin: Expr, // 1 + 1
+//     length: Expr,
+// }
+
+// struct Attributes {
+//     span: Span,
+//     elements: Vec<Attribute>, // r x
+// }
+
+// // check `syn` crate as a reference
+// // 1 + 2
+// // ^   ^
+// // 1 + 2 + 3 + 4 + 5
+// // +++++
+// // ---------
+// // *************
+// struct Expr {
+//     span: Span,
+//     kind: ExprKind,
+// }
+
+// enum ExprKind {
+//     Symbol(String),
+//     Number(u32),        // 128
+//     Binary(BinaryExpr), // 1 + 1
+//     Paren(ParenExpr),   // (1 + 2)
+// }
+
+// // 1 + 2 * 3 -> Bin(+, 1, Bin(*, 2, 3))
+// // (1 + 2) * 3 -> Bin(+, Paren(Bin(*, 1, 2)), 3)
+// // (2) + 3 -> Bin(+, Paren(2), 3)
+// // 2 + 3 -> Bin(+, 2, 3)
+
+// // 1 + 1
+// struct BinaryExpr {
+//     lhs: Box<Expr>,
+//     op: Operator,
+//     rhs: Box<Expr>,
+// }
+
+// struct ParenExpr {
+//     inner: Box<Expr>,
+
+// enum Operator {
+//     Plus,
+//     Minus,
+// }
+
+// pub fn lex(input: &str) -> Vec<Token> {
+//     todo!()
+// }
+
+// pub fn parse(tokens: Vec<Token>) -> LinkerScript {
+//     let tokens = tokens.into_iter();
+//     while let Some(token) = tokens {
+//         match token {
+//             Number(num) => {
+//                 let next = tokens.next();
+//                 match next {
+//                     Some(Token::Operator(op)) => {
+//                         // binary expression -> BinaryExpr
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
+// // parser ^
+
+// // flip-link
+// fn compute_ram_region(linker_script: &LinkerScript) {
+//     // iterate over regions
+//     // look for name == "RAM"
+//     // evaluate ORIGIN expr
+//     // evaluate LENGTH expr
+// }
+
+// fn eval(expr: &Expr) -> u32 {
+//     // ..
+// }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+
+//     #[test]
+//     fn empty_memory() {
+//         let input = "MEMORY {}";
+//         let tokens = lex(input);
+//         let linker_script = parse(tokens);
+//         assert_eq!(1, linker_script.commands.len());
+//         let command = linker_script.commands[0];
+//         match command {
+//             Command::Memory(memory) => {
+//                 assert!(memory.regions.is_empty());
+//             }
+//             _ => unreachable!(), // === panic!("this is unreachable")
+//         }
+//     }
+
+//     //
+// }

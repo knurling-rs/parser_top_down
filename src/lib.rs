@@ -1,3 +1,5 @@
+use lexer::Token;
+
 use crate::lexer::TokenKind;
 
 mod lexer;
@@ -10,21 +12,28 @@ pub struct LinkerScript {
 
 #[derive(Debug, PartialEq)]
 enum Command {
-    Memory { regions: Option<Regions> },
+    Memory { regions: Vec<Region> },
     Sections,
 }
 
 #[derive(Debug, PartialEq)]
-struct Regions;
+struct Region {
+    id: String,
+}
 
 // #[derive(Debug, PartialEq)]
 // struct Memory;
 
 // #[derive(Debug, PartialEq)]
 // struct Sections;
+fn has_regions(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> bool {
+    it.peek().unwrap().token_kind != TokenKind::CurlyClose
+}
 
 pub fn parse(str: &str) -> LinkerScript {
     let tokens = lexer::lexer(str);
+    // println!("Printing tokens {:#?}", tokens);
+
     // consumes the value
     // dbg!(tokens);
     // dbg consumes the value and returns it right away for evaluation
@@ -36,25 +45,11 @@ pub fn parse(str: &str) -> LinkerScript {
         let mut it = tokens.into_iter().peekable();
 
         while let Some(t) = it.next() {
+            println!("Inside Parse 1: {:#?}", t);
             match t.token_kind {
                 TokenKind::Word(w) => {
                     if w == "MEMORY" {
-                        // Open curly
-                        assert!(it.next().unwrap().token_kind == TokenKind::CurlyOpen);
-                        if it.next().unwrap().token_kind != TokenKind::CurlyClose {
-                            commands.push(Command::Memory {
-                                regions: Some(Regions),
-                            });
-                            // skip_while consummes and it is a problem at the next while let
-                            // same than while let Some(t2) = it.next() {
-                            for t2 in it.by_ref() {
-                                if t2.token_kind == TokenKind::CurlyClose {
-                                    break;
-                                }
-                            }
-                        } else {
-                            commands.push(Command::Memory { regions: None });
-                        }
+                        parse_memory(&mut it, &mut commands);
                     } else if w == "SECTIONS" {
                         commands.push(Command::Sections)
                     }
@@ -65,6 +60,69 @@ pub fn parse(str: &str) -> LinkerScript {
             }
         }
         LinkerScript { commands }
+    }
+}
+
+fn parse_memory(
+    it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>,
+    commands: &mut Vec<Command>,
+) {
+    // "MEMORY { RAM: ORIGIN = 1, LENGTH = 2 }"
+    // This prints CurlyOpen
+    println!("Inside parse memory 1 {:#?}", it.peek().unwrap());
+
+    assert!(it.next().unwrap().token_kind == TokenKind::CurlyOpen);
+    // This prints RAM
+    println!("Inside parse memory 2 {:#?}", it.peek().unwrap());
+    //println!("Extra next: {:#?}", it.next());
+    if has_regions(it) {
+        let mut regions = Vec::new();
+        while let Some(t) = it.next() {
+            println!("Current token! {:#?}", t);
+            assert!(matches!(t.token_kind, TokenKind::Word { .. }));
+            println!("Current token 2! {:#?}", it.peek());
+            assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
+            assert!(matches!(
+                it.next().unwrap().token_kind,
+                TokenKind::Word { .. }
+            ));
+            assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
+            assert!(matches!(
+                it.next().unwrap().token_kind,
+                TokenKind::Number { .. }
+            ));
+            assert_eq!(it.next().unwrap().token_kind, TokenKind::Comma);
+            assert!(matches!(
+                it.next().unwrap().token_kind,
+                TokenKind::Word { .. }
+            ));
+            assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
+            assert!(matches!(
+                it.next().unwrap().token_kind,
+                TokenKind::Number { .. }
+            ));
+
+            let region = Region {
+                id: "RAM".to_string(),
+            };
+            dbg!(&regions);
+            println!("Before match {:#?}", it.peek());
+            regions.push(region);
+            match it.peek().unwrap().token_kind {
+                TokenKind::CurlyClose => {
+                    it.next();
+                    // no push in struct initialisation
+                }
+                _ => continue,
+            }
+        }
+
+        commands.push(Command::Memory { regions: regions });
+
+        // skip_while consummes and it is a problem at the next while let
+        // same than while let Some(t2) = it.next() {
+    } else {
+        commands.push(Command::Memory { regions: vec![] });
     }
 }
 //tmod expands!!
@@ -82,12 +140,9 @@ mod tests {
 
     #[test]
     fn memory_string() {
-        assert_eq!(
-            LinkerScript {
-                commands: vec![Command::Memory { regions: None }]
-            },
-            parse("MEMORY {}")
-        );
+        let ls = parse("MEMORY {}");
+        assert_eq!(ls.commands.len(), 1);
+        assert!(matches!(ls.commands[0], Command::Memory { .. }));
     }
 
     #[test]
@@ -111,163 +166,37 @@ mod tests {
 
     #[test]
     fn memory_ram() {
-        assert_eq!(
-            LinkerScript {
-                commands: vec![Command::Memory {
-                    regions: Some(Regions)
-                }]
-            },
-            parse("MEMORY { RAM: ORIGIN = 1, LENGTH = 2 }")
+        let ls = parse("MEMORY { RAM: ORIGIN = 1, LENGTH = 2 }");
+        assert_eq!(ls.commands.len(), 1);
+
+        match &ls.commands[0] {
+            Command::Memory { regions } => assert_eq!(regions.len(), 1),
+            Command::Sections => unreachable!("This arm should not be unreachable."),
+        }
+    }
+
+    #[test]
+    fn memory_ram_2() {
+        let ls = parse(
+            "
+MEMORY 
+{ 
+    RAM:   ORIGIN = 1, LENGTH = 2 
+    RAM:   ORIGIN = 3, LENGTH = 4 
+}
+",
         );
+        assert_eq!(ls.commands.len(), 1);
+
+        match ls.commands[0] {
+            // Cannot move out an element of the vector
+            // indexing with square brackets --> get ref
+            Command::Memory { ref regions } => {
+                assert_eq!(regions.len(), 2);
+                assert_eq!(regions[0].id, "RAM");
+                assert_eq!(regions[1].id, "RAM");
+            }
+            Command::Sections => todo!(),
+        }
     }
 }
-
-// type Span = Range<usize>;
-
-// struct Token {
-//     kind: TokenKind,
-//     span: Span,
-// }
-
-// enum TokenKind {
-//     Plus,
-//     // ..
-// }
-
-// struct LinkerScript {
-//     commands: Vec<Command>,
-// }
-
-// struct Command {
-//     kind: CommandKind,
-//     span: Span,
-// }
-
-// enum CommandKind {
-//     Memory(Memory), // MEMORY { .. }
-//     //                 ^           ^ span
-//     Sections, // SECTIONS { .. }
-// }
-
-// /*
-// SECTIONS {
-//   _var = 0;
-
-//   .text : var + 1 {
-
-//   } > FLASH
-
-// }
-//  */
-// struct Memory {
-//     span: Span,
-//     regions: Vec<Region>, // FLASH (r w x) ORIGIN = 0, LENGTH = 128
-//                           // ^                                 ^ span
-//                           // ..
-// }
-
-// struct Region {
-//     name: String,
-//     attributes: Attributes,
-//     origin: Expr, // 1 + 1
-//     length: Expr,
-// }
-
-// struct Attributes {
-//     span: Span,
-//     elements: Vec<Attribute>, // r x
-// }
-
-// // check `syn` crate as a reference
-// // 1 + 2
-// // ^   ^
-// // 1 + 2 + 3 + 4 + 5
-// // +++++
-// // ---------
-// // *************
-// struct Expr {
-//     span: Span,
-//     kind: ExprKind,
-// }
-
-// enum ExprKind {
-//     Symbol(String),
-//     Number(u32),        // 128
-//     Binary(BinaryExpr), // 1 + 1
-//     Paren(ParenExpr),   // (1 + 2)
-// }
-
-// // 1 + 2 * 3 -> Bin(+, 1, Bin(*, 2, 3))
-// // (1 + 2) * 3 -> Bin(+, Paren(Bin(*, 1, 2)), 3)
-// // (2) + 3 -> Bin(+, Paren(2), 3)
-// // 2 + 3 -> Bin(+, 2, 3)
-
-// // 1 + 1
-// struct BinaryExpr {
-//     lhs: Box<Expr>,
-//     op: Operator,
-//     rhs: Box<Expr>,
-// }
-
-// struct ParenExpr {
-//     inner: Box<Expr>,
-
-// enum Operator {
-//     Plus,
-//     Minus,
-// }
-
-// pub fn lex(input: &str) -> Vec<Token> {
-//     todo!()
-// }
-
-// pub fn parse(tokens: Vec<Token>) -> LinkerScript {
-//     let tokens = tokens.into_iter();
-//     while let Some(token) = tokens {
-//         match token {
-//             Number(num) => {
-//                 let next = tokens.next();
-//                 match next {
-//                     Some(Token::Operator(op)) => {
-//                         // binary expression -> BinaryExpr
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
-// // parser ^
-
-// // flip-link
-// fn compute_ram_region(linker_script: &LinkerScript) {
-//     // iterate over regions
-//     // look for name == "RAM"
-//     // evaluate ORIGIN expr
-//     // evaluate LENGTH expr
-// }
-
-// fn eval(expr: &Expr) -> u32 {
-//     // ..
-// }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn empty_memory() {
-//         let input = "MEMORY {}";
-//         let tokens = lex(input);
-//         let linker_script = parse(tokens);
-//         assert_eq!(1, linker_script.commands.len());
-//         let command = linker_script.commands[0];
-//         match command {
-//             Command::Memory(memory) => {
-//                 assert!(memory.regions.is_empty());
-//             }
-//             _ => unreachable!(), // === panic!("this is unreachable")
-//         }
-//     }
-
-//     //
-// }
