@@ -1,3 +1,10 @@
+// TODO:
+// 1. Handle units in expression
+// 2. Parse attributes (rx..)
+// Error handling
+// Alternative syntax origin ORG o and length...
+// Sections
+
 use lexer::Token;
 
 use crate::lexer::TokenKind;
@@ -30,7 +37,13 @@ struct Expr {
 #[derive(Debug, PartialEq)]
 enum ExprKind {
     Number(u64),
+    NumberUnit(u64, Unit),
     BinExpr(Box<Expr>, Op, Box<Expr>),
+}
+#[derive(Debug, PartialEq)]
+enum Unit {
+    K,
+    M,
 }
 
 #[derive(Debug, PartialEq)]
@@ -89,7 +102,7 @@ fn parse_memory(
         while let Some(t) = it.next() {
             let id = match &t.token_kind {
                 TokenKind::Word(w) => w,
-                _ => unreachable!("should not happen"),
+                _ => unreachable!("Should not happen."),
             };
             assert!(matches!(t.token_kind, TokenKind::Word { .. }));
             assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
@@ -134,14 +147,35 @@ fn parse_memory(
 }
 
 fn parse_expr(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> Expr {
-    assert!(matches!(
-        it.peek().unwrap().token_kind,
-        TokenKind::Number { .. }
-    ));
+    // assert!(matches!(
+    //     it.peek().unwrap().token_kind,
+    //     TokenKind::Number { .. }
+    // ));
     let origin = match it.next().unwrap().token_kind {
         TokenKind::Number(o) => Expr {
             expr_kind: ExprKind::Number(o),
         },
+
+        /*
+        let number_len = self
+            .line
+            .find(|c: char| !c.is_ascii_hexdigit())
+            .unwrap_or(self.line.len());
+
+        let mut number = u64::from_str_radix(&self.line[..number_len], radix).map_err(|_| Error)?;
+        */
+        TokenKind::Word(s) => {
+            let pos_n = s.chars().position(|c| !c.is_numeric()).unwrap();
+            let n = (&s[..pos_n]).parse::<u64>().unwrap();
+            let u = match &s[pos_n..] {
+                "K" => Unit::K,
+                "M" => Unit::M,
+                _ => unreachable!("wrong unit"),
+            };
+            Expr {
+                expr_kind: ExprKind::NumberUnit(n, u),
+            }
+        }
         _ => unreachable!("should be a number"),
     };
 
@@ -290,12 +324,24 @@ MEMORY
     }
     //tfn macro
     #[test]
-    fn parse_expr_1() {
+    fn parse_expr_1_1() {
         let tokens: Vec<Token> = vec![Token::test_new(TokenKind::Number(0))];
         let expr = parse_expr(&mut tokens.into_iter().peekable());
         assert_eq!(
             Expr {
                 expr_kind: ExprKind::Number(0)
+            },
+            expr
+        );
+    }
+
+    #[test]
+    fn parse_expr_1_2() {
+        let tokens: Vec<Token> = vec![Token::test_new(TokenKind::Word("1K".to_string()))];
+        let expr = parse_expr(&mut tokens.into_iter().peekable());
+        assert_eq!(
+            Expr {
+                expr_kind: ExprKind::NumberUnit(1, Unit::K),
             },
             expr
         );
