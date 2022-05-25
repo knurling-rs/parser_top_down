@@ -19,10 +19,24 @@ enum Command {
 #[derive(Debug, PartialEq)]
 struct Region {
     id: String,
-    origin: u64,
-    length: u64,
+    origin: Expr,
+    length: Expr,
+}
+#[derive(Debug, PartialEq)]
+struct Expr {
+    expr_kind: ExprKind,
 }
 
+#[derive(Debug, PartialEq)]
+enum ExprKind {
+    Number(u64),
+    BinExpr(Box<Expr>, Op, Box<Expr>),
+}
+
+#[derive(Debug, PartialEq)]
+enum Op {
+    Plus,
+}
 // #[derive(Debug, PartialEq)]
 // struct Memory;
 
@@ -118,7 +132,7 @@ fn parse_memory(
     }
 }
 
-fn parse_expr(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> u64 {
+fn parse_expr(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> Expr {
     assert!(matches!(
         it.peek().unwrap().token_kind,
         TokenKind::Number { .. }
@@ -127,7 +141,9 @@ fn parse_expr(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> u64 {
         TokenKind::Number(o) => o,
         _ => unreachable!("should be a number"),
     };
-    origin
+    Expr {
+        expr_kind: ExprKind::Number(origin),
+    }
 }
 //tmod expands!!
 #[cfg(test)]
@@ -222,11 +238,31 @@ MEMORY
             Command::Memory { ref regions } => {
                 assert_eq!(regions.len(), 2);
                 assert_eq!(regions[0].id, "RAM");
-                assert_eq!(regions[0].origin, 1);
-                assert_eq!(regions[0].length, 2);
+                assert_eq!(
+                    regions[0].origin,
+                    Expr {
+                        expr_kind: ExprKind::Number(1)
+                    }
+                );
+                assert_eq!(
+                    regions[0].length,
+                    Expr {
+                        expr_kind: ExprKind::Number(2)
+                    }
+                );
                 assert_eq!(regions[1].id, "FLASH");
-                assert_eq!(regions[1].origin, 3);
-                assert_eq!(regions[1].length, 4);
+                assert_eq!(
+                    regions[1].origin,
+                    Expr {
+                        expr_kind: ExprKind::Number(3)
+                    }
+                );
+                assert_eq!(
+                    regions[1].length,
+                    Expr {
+                        expr_kind: ExprKind::Number(4)
+                    }
+                );
             }
             Command::Sections => todo!(),
         }
@@ -236,6 +272,21 @@ MEMORY
     fn parse_expr_1() {
         let tokens: Vec<Token> = vec![Token::test_new(TokenKind::Number(0))];
         let expr = parse_expr(&mut tokens.into_iter().peekable());
-        assert_eq!(0, expr);
+        assert_eq!(
+            Expr {
+                expr_kind: ExprKind::Number(0)
+            },
+            expr
+        );
+    }
+
+    #[test]
+    fn parse_expr_2() {
+        let tokens: Vec<Token> = vec![
+            Token::test_new(TokenKind::Number(0)),
+            Token::test_new(TokenKind::Plus),
+            Token::test_new(TokenKind::Number(1)),
+        ];
+        let expr = parse_expr(&mut tokens.into_iter().peekable());
     }
 }
