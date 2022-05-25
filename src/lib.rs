@@ -70,6 +70,10 @@ fn parse_memory(
     if has_regions(it) {
         let mut regions = Vec::new();
         while let Some(t) = it.next() {
+            let id = match &t.token_kind {
+                TokenKind::Word(w) => w,
+                _ => unreachable!("should not happen"),
+            };
             assert!(matches!(t.token_kind, TokenKind::Word { .. }));
             assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
             assert!(matches!(
@@ -92,9 +96,7 @@ fn parse_memory(
                 TokenKind::Number { .. }
             ));
 
-            let region = Region {
-                id: "RAM".to_string(),
-            };
+            let region = Region { id: id.to_string() };
 
             regions.push(region);
             match it.peek().unwrap().token_kind {
@@ -183,6 +185,31 @@ MEMORY
                 assert_eq!(regions.len(), 2);
                 assert_eq!(regions[0].id, "RAM");
                 assert_eq!(regions[1].id, "RAM");
+            }
+            Command::Sections => todo!(),
+        }
+    }
+
+    #[test]
+    fn memory_ram_flash() {
+        let ls = parse(
+            "
+MEMORY 
+{ 
+    RAM:   ORIGIN = 1, LENGTH = 2 
+    FLASH:   ORIGIN = 3, LENGTH = 4 
+}
+",
+        );
+        assert_eq!(ls.commands.len(), 1);
+
+        match ls.commands[0] {
+            // Cannot move out an element of the vector
+            // indexing with square brackets --> get ref
+            Command::Memory { ref regions } => {
+                assert_eq!(regions.len(), 2);
+                assert_eq!(regions[0].id, "RAM");
+                assert_eq!(regions[1].id, "FLASH");
             }
             Command::Sections => todo!(),
         }
