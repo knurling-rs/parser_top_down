@@ -156,14 +156,6 @@ fn parse_expr(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> Expr {
             expr_kind: ExprKind::Number(o),
         },
 
-        /*
-        let number_len = self
-            .line
-            .find(|c: char| !c.is_ascii_hexdigit())
-            .unwrap_or(self.line.len());
-
-        let mut number = u64::from_str_radix(&self.line[..number_len], radix).map_err(|_| Error)?;
-        */
         TokenKind::Word(s) => {
             let pos_n = s.chars().position(|c| !c.is_numeric()).unwrap();
             let n = (&s[..pos_n]).parse::<u64>().unwrap();
@@ -342,6 +334,18 @@ MEMORY
         assert_eq!(
             Expr {
                 expr_kind: ExprKind::NumberUnit(1, Unit::K),
+            },
+            expr
+        );
+    }
+
+    #[test]
+    fn parse_expr_1_3() {
+        let tokens: Vec<Token> = vec![Token::test_new(TokenKind::Word("1M".to_string()))];
+        let expr = parse_expr(&mut tokens.into_iter().peekable());
+        assert_eq!(
+            Expr {
+                expr_kind: ExprKind::NumberUnit(1, Unit::M),
             },
             expr
         );
