@@ -19,6 +19,8 @@ enum Command {
 #[derive(Debug, PartialEq)]
 struct Region {
     id: String,
+    origin: u64,
+    length: u64,
 }
 
 // #[derive(Debug, PartialEq)]
@@ -82,9 +84,13 @@ fn parse_memory(
             ));
             assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
             assert!(matches!(
-                it.next().unwrap().token_kind,
+                it.peek().unwrap().token_kind,
                 TokenKind::Number { .. }
             ));
+            let origin = match it.next().unwrap().token_kind {
+                TokenKind::Number(o) => o,
+                _ => unreachable!("should be a number"),
+            };
             assert_eq!(it.next().unwrap().token_kind, TokenKind::Comma);
             assert!(matches!(
                 it.next().unwrap().token_kind,
@@ -92,11 +98,18 @@ fn parse_memory(
             ));
             assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
             assert!(matches!(
-                it.next().unwrap().token_kind,
+                it.peek().unwrap().token_kind,
                 TokenKind::Number { .. }
             ));
-
-            let region = Region { id: id.to_string() };
+            let length = match it.next().unwrap().token_kind {
+                TokenKind::Number(l) => l,
+                _ => unreachable!("should be a number"),
+            };
+            let region = Region {
+                id: id.to_string(),
+                origin,
+                length,
+            };
 
             regions.push(region);
             match it.peek().unwrap().token_kind {
@@ -209,7 +222,11 @@ MEMORY
             Command::Memory { ref regions } => {
                 assert_eq!(regions.len(), 2);
                 assert_eq!(regions[0].id, "RAM");
+                assert_eq!(regions[0].origin, 1);
+                assert_eq!(regions[0].length, 2);
                 assert_eq!(regions[1].id, "FLASH");
+                assert_eq!(regions[1].origin, 3);
+                assert_eq!(regions[1].length, 4);
             }
             Command::Sections => todo!(),
         }
