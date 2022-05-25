@@ -45,7 +45,6 @@ pub fn parse(str: &str) -> LinkerScript {
         let mut it = tokens.into_iter().peekable();
 
         while let Some(t) = it.next() {
-            println!("Inside Parse 1: {:#?}", t);
             match t.token_kind {
                 TokenKind::Word(w) => {
                     if w == "MEMORY" {
@@ -67,20 +66,11 @@ fn parse_memory(
     it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>,
     commands: &mut Vec<Command>,
 ) {
-    // "MEMORY { RAM: ORIGIN = 1, LENGTH = 2 }"
-    // This prints CurlyOpen
-    println!("Inside parse memory 1 {:#?}", it.peek().unwrap());
-
     assert!(it.next().unwrap().token_kind == TokenKind::CurlyOpen);
-    // This prints RAM
-    println!("Inside parse memory 2 {:#?}", it.peek().unwrap());
-    //println!("Extra next: {:#?}", it.next());
     if has_regions(it) {
         let mut regions = Vec::new();
         while let Some(t) = it.next() {
-            println!("Current token! {:#?}", t);
             assert!(matches!(t.token_kind, TokenKind::Word { .. }));
-            println!("Current token 2! {:#?}", it.peek());
             assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
             assert!(matches!(
                 it.next().unwrap().token_kind,
@@ -105,8 +95,7 @@ fn parse_memory(
             let region = Region {
                 id: "RAM".to_string(),
             };
-            dbg!(&regions);
-            println!("Before match {:#?}", it.peek());
+
             regions.push(region);
             match it.peek().unwrap().token_kind {
                 TokenKind::CurlyClose => {
@@ -117,7 +106,7 @@ fn parse_memory(
             }
         }
 
-        commands.push(Command::Memory { regions: regions });
+        commands.push(Command::Memory { regions });
 
         // skip_while consummes and it is a problem at the next while let
         // same than while let Some(t2) = it.next() {
@@ -128,7 +117,6 @@ fn parse_memory(
 //tmod expands!!
 #[cfg(test)]
 mod tests {
-    use std::vec;
 
     use super::*;
 
