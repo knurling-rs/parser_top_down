@@ -36,6 +36,7 @@ enum ExprKind {
 #[derive(Debug, PartialEq)]
 enum Op {
     Plus,
+    Minus,
 }
 // #[derive(Debug, PartialEq)]
 // struct Memory;
@@ -145,12 +146,17 @@ fn parse_expr(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> Expr {
     };
 
     if let Some(t) = it.peek() {
-        match t.token_kind {
-            TokenKind::Plus => {
+        match &t.token_kind {
+            s @ (TokenKind::Plus | TokenKind::Minus) => {
+                let s = match s {
+                    TokenKind::Plus => Op::Plus,
+                    TokenKind::Minus => Op::Minus,
+                    _ => unreachable!("Plus or minus are expected"),
+                };
                 it.next();
                 let exp2 = parse_expr(it);
                 Expr {
-                    expr_kind: ExprKind::BinExpr(Box::new(origin), Op::Plus, Box::new(exp2)),
+                    expr_kind: ExprKind::BinExpr(Box::new(origin), s, Box::new(exp2)),
                 }
             }
             _ => origin,
@@ -310,6 +316,30 @@ MEMORY
                         expr_kind: ExprKind::Number(0)
                     }),
                     Op::Plus,
+                    Box::new(Expr {
+                        expr_kind: ExprKind::Number(1)
+                    }),
+                )
+            },
+            expr
+        )
+    }
+
+    #[test]
+    fn parse_expr_2_1() {
+        let tokens: Vec<Token> = vec![
+            Token::test_new(TokenKind::Number(0)),
+            Token::test_new(TokenKind::Minus),
+            Token::test_new(TokenKind::Number(1)),
+        ];
+        let expr = parse_expr(&mut tokens.into_iter().peekable());
+        assert_eq!(
+            Expr {
+                expr_kind: ExprKind::BinExpr(
+                    Box::new(Expr {
+                        expr_kind: ExprKind::Number(0)
+                    }),
+                    Op::Minus,
                     Box::new(Expr {
                         expr_kind: ExprKind::Number(1)
                     }),
