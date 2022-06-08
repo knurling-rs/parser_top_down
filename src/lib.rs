@@ -1,9 +1,10 @@
 // TODO:
-// 1. Handle units in expression
-// 2. Parse attributes (rx..)
-// Error handling
-// Alternative syntax origin ORG o and length...
-// Sections
+// 1. Change lexer to keep number and unit together
+// 2. Handle units in expression
+// 3. Parse attributes (rx..)
+// 4. Error handling
+// 5. Alternative syntax origin ORG o and length...
+// 6. Sections
 
 use lexer::Token;
 
@@ -198,12 +199,14 @@ mod tests {
 
     use super::*;
 
+    // ok
     #[test]
     fn empty_string() {
         let ls = parse("");
         assert!(ls.commands.is_empty());
     }
 
+    // ok
     #[test]
     fn memory_string() {
         let ls = parse("MEMORY {}");
@@ -211,6 +214,7 @@ mod tests {
         assert!(matches!(ls.commands[0], Command::Memory { .. }));
     }
 
+    // ok
     #[test]
     fn two_memory_word_string() {
         let linker_script = parse("MEMORY {} MEMORY {}");
@@ -220,6 +224,7 @@ mod tests {
         assert!(matches!(linker_script.commands[1], Command::Memory { .. }));
     }
 
+    // ok
     #[test]
     fn section_string() {
         let linker_script = parse("SECTIONS {}");
@@ -230,6 +235,7 @@ mod tests {
         ));
     }
 
+    // hangs
     #[test]
     fn memory_ram() {
         let ls = parse("MEMORY { RAM: ORIGIN = 1, LENGTH = 2 }");
@@ -241,6 +247,18 @@ mod tests {
         }
     }
 
+    #[test]
+    fn memory_ram_with_comma_and_white_space() {
+        let ls = parse("MEMORY { RAM: ORIGIN = 1 , LENGTH = 2 }");
+        assert_eq!(ls.commands.len(), 1);
+
+        match &ls.commands[0] {
+            Command::Memory { regions } => assert_eq!(regions.len(), 1),
+            Command::Sections => unreachable!("This arm should not be unreachable."),
+        }
+    }
+
+    // hangs
     #[test]
     fn memory_ram_2() {
         let ls = parse(
@@ -266,13 +284,14 @@ MEMORY
         }
     }
 
+    // hangs
     #[test]
     fn memory_ram_flash() {
         let ls = parse(
             "
 MEMORY 
 { 
-    RAM:   ORIGIN = 1, LENGTH = 2 
+    RAM:   ORIGIN = 1K, LENGTH = 2 
     FLASH:   ORIGIN = 3, LENGTH = 4 
 }
 ",
@@ -288,7 +307,7 @@ MEMORY
                 assert_eq!(
                     regions[0].origin,
                     Expr {
-                        expr_kind: ExprKind::Number(1)
+                        expr_kind: ExprKind::NumberUnit(1, Unit::K)
                     }
                 );
                 assert_eq!(
@@ -315,8 +334,9 @@ MEMORY
         }
     }
     //tfn macro
+    // ok
     #[test]
-    fn parse_expr_1_1() {
+    fn parse_expr_number() {
         let tokens: Vec<Token> = vec![Token::test_new(TokenKind::Number(0))];
         let expr = parse_expr(&mut tokens.into_iter().peekable());
         assert_eq!(
@@ -327,8 +347,9 @@ MEMORY
         );
     }
 
+    // ok
     #[test]
-    fn parse_expr_1_2() {
+    fn parse_expr_number_unit_1() {
         let tokens: Vec<Token> = vec![Token::test_new(TokenKind::Word("1K".to_string()))];
         let expr = parse_expr(&mut tokens.into_iter().peekable());
         assert_eq!(
@@ -339,8 +360,9 @@ MEMORY
         );
     }
 
+    // ok
     #[test]
-    fn parse_expr_1_3() {
+    fn parse_expr_number_unit_2() {
         let tokens: Vec<Token> = vec![Token::test_new(TokenKind::Word("1M".to_string()))];
         let expr = parse_expr(&mut tokens.into_iter().peekable());
         assert_eq!(
@@ -351,8 +373,27 @@ MEMORY
         );
     }
 
+    // hangs
     #[test]
-    fn parse_expr_2() {
+    fn parse_expr_number_unit_3() {
+        let tokens: Vec<Token> = vec![Token::test_new(TokenKind::Word("1M".to_string()))];
+        let expr = parse("MEMORY { RAM: ORIGIN = Ox1, LENGTH = 128K}");
+        match &expr.commands[0] {
+            Command::Memory { regions } => match &regions[0].length.expr_kind {
+                ExprKind::NumberUnit(n, u) => {
+                    assert_eq!(128, *n);
+                    assert_eq!(Unit::K, *u);
+                }
+                ExprKind::Number(_) => unreachable!("This test should produce number unit"),
+                ExprKind::BinExpr(_, _, _) => unreachable!("This test should produce number unit"),
+            },
+            Command::Sections => unreachable!("This test should produce number unit"),
+        }
+    }
+
+    // ok
+    #[test]
+    fn parse_expr_two_numbers_with_plus() {
         let tokens: Vec<Token> = vec![
             Token::test_new(TokenKind::Number(0)),
             Token::test_new(TokenKind::Plus),
@@ -375,8 +416,9 @@ MEMORY
         )
     }
 
+    // ok
     #[test]
-    fn parse_expr_2_1() {
+    fn parse_expr_two_numbers_with_minus() {
         let tokens: Vec<Token> = vec![
             Token::test_new(TokenKind::Number(0)),
             Token::test_new(TokenKind::Minus),
@@ -400,8 +442,9 @@ MEMORY
     }
 
     // use .box
+    // ok
     #[test]
-    fn parse_expr_3() {
+    fn parse_expr_with_two_plus() {
         let tokens: Vec<Token> = vec![
             Token::test_new(TokenKind::Number(0)),
             Token::test_new(TokenKind::Plus),
