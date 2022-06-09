@@ -39,7 +39,7 @@ impl Token {
 fn is_delimiter(c: Option<char>) -> bool {
     if let Some(c) = c {
         match c {
-            ' ' | ',' | '\n' | '}' | '{' => true,
+            ' ' | ',' | '\n' | '}' | '{' | ':' => true,
             _ => false,
         }
     } else {
@@ -269,6 +269,21 @@ mod tests {
                 }
             ],
             lexer("a0a,")
+        );
+    }
+
+    #[test]
+    fn word_with_letters_and_numbers_ends_colon() {
+        assert_eq!(
+            vec![
+                create_token_word("RAM", 0, 3, 0),
+                Token {
+                    token_kind: TokenKind::Colon,
+                    span: 3..4,
+                    line_number: 0
+                }
+            ],
+            lexer("RAM:")
         );
     }
     #[test]

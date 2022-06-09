@@ -158,6 +158,7 @@ fn parse_expr(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> Expr {
         },
 
         TokenKind::Word(s) => {
+            dbg!(&s);
             let pos_n = s.chars().position(|c| !c.is_numeric()).unwrap();
             let n = (&s[..pos_n]).parse::<u64>().unwrap();
             let u = match &s[pos_n..] {
@@ -198,6 +199,7 @@ fn parse_expr(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> Expr {
 mod tests {
 
     use super::*;
+    use pretty_assertions::assert_eq;
 
     // ok
     #[test]
@@ -376,7 +378,7 @@ MEMORY
     // hangs
     #[test]
     fn parse_expr_number_unit_3() {
-        let expr = parse("MEMORY { RAM: ORIGIN = Ox1, LENGTH = 128K}");
+        let expr = parse("MEMORY { RAM: ORIGIN = 0x1, LENGTH = 128K}");
         match &expr.commands[0] {
             Command::Memory { regions } => match &regions[0].length.expr_kind {
                 ExprKind::NumberUnit(n, u) => {
