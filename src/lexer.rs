@@ -36,7 +36,7 @@ impl Token {
         }
     }
 }
-fn is_number_delimiter(c: Option<char>) -> bool {
+fn is_delimiter(c: Option<char>) -> bool {
     if let Some(c) = c {
         match c {
             ' ' | ',' | '\n' | '}' | '{' => true,
@@ -121,24 +121,30 @@ pub fn lexer(script: &str) -> Vec<Token> {
                 // Tighten up error management at this stage, or by the parser? What about negative numbers etc.
                 // map returns None without panicking
                 let next_char = it.peek().map(|(u, c)| *c);
-                if dbg!(is_number_delimiter(next_char)) {
+                if dbg!(is_delimiter(next_char)) {
                     let number = u64::from_str_radix(&script[from..to], radix).unwrap();
                     push_token(TokenKind::Number(number), index..to);
                 } else {
                     let mut index_u: Option<usize> = None;
+                    // keeps a state of the iteration
+                    // peek --> reference into that state
+                    // end that borrow into current state before next
+                    // next updates the state
                     while let Some((u, c)) = it.peek() {
-                        if *c != ' ' {
-                            it.next();
-                        } else {
+                        //256K_
+                        if is_delimiter(Some(*c)) {
+                            // need to end the u borrow before it.next()
                             index_u = Some(*u);
+                            // Unquote for infinite loop
                             break;
                         }
+                        it.next();
                         //125something\n
-                        //125
+                        //125_
                     }
                     if let Some(index_u) = index_u {
                         push_token(
-                            TokenKind::Word(script[from..=index_u].to_string()),
+                            TokenKind::Word(script[from..index_u].to_string()),
                             (from..index_u),
                         );
                     } else {
@@ -150,10 +156,30 @@ pub fn lexer(script: &str) -> Vec<Token> {
                 }
             }
             'a'..='z' | 'A'..='Z' => {
-                let to = advance_while(it.by_ref(), |c: &char| !c.is_alphabetic())
-                    .unwrap_or(script.len());
+                let from = index;
 
-                push_token(TokenKind::Word(script[index..to].to_string()), index..to)
+                //a0a a 0 a
+                while let Some((u, c)) = it.peek() {
+                    // c is borrowing the iterator
+                    if is_delimiter(Some(*c)) {
+                        break;
+                    }
+                    // c relases the iterator
+                    it.next();
+                }
+                let to = it.peek().map(|(u, c)| *u);
+
+                if to.is_some() {
+                    push_token(
+                        TokenKind::Word(script[from..to.unwrap()].to_string()),
+                        index..to.unwrap(),
+                    )
+                } else {
+                    push_token(
+                        TokenKind::Word(script[from..script.len()].to_string()),
+                        index..script.len(),
+                    )
+                }
             }
             // to be decided: substraction? division? multiplication ..?
             _ => {
@@ -187,6 +213,7 @@ fn advance_while(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
     #[test]
     fn lexer_1() {
         let empty: Vec<Token> = Vec::new();
@@ -228,7 +255,21 @@ mod tests {
     // fix that, it starts with a letter and then quit the branch
     #[test]
     fn word_with_letters_and_numbers() {
-        assert_eq!(vec![create_token_word("a0a", 0, 2, 0)], lexer("a0a"));
+        assert_eq!(vec![create_token_word("a0a", 0, 3, 0)], lexer("a0a"));
+    }
+    #[test]
+    fn word_with_letters_and_numbers_ends_comma() {
+        assert_eq!(
+            vec![
+                create_token_word("a0a", 0, 3, 0),
+                Token {
+                    token_kind: TokenKind::Comma,
+                    span: 3..4,
+                    line_number: 0
+                }
+            ],
+            lexer("a0a,")
+        );
     }
     #[test]
     fn lexer_2_1_with_space_before() {
@@ -358,10 +399,7 @@ Very unclear comment
         let number_and_unit = "256K";
         assert_eq!(
             lexer(number_and_unit),
-            vec![
-                create_token_number(256, 0, 3, 0),
-                create_token_word("K", 3, 4, 0)
-            ]
+            vec![create_token_word("256K", 0, 4, 0)]
         );
     }
 
@@ -453,8 +491,7 @@ PROBLEMS
                 span: (49..50),
                 line_number: 2,
             },
-            create_token_number(256, 51, 54, 2),
-            create_token_word("K", 54, 55, 2),
+            create_token_word("256K", 51, 55, 2),
             Token {
                 token_kind: TokenKind::CurlyClose,
                 span: (56..57),
@@ -462,7 +499,7 @@ PROBLEMS
             },
         ];
 
-        assert_eq!(lexer(LINKER_SCRIPT), expected);
+        assert_eq!(expected, lexer(LINKER_SCRIPT));
     }
 
     #[test]
@@ -473,16 +510,10 @@ LINKER.x
 
         let expected = vec![
             create_token_word("MEMORY", 0, 6, 0),
-            create_token_word("LINKER", 7, 13, 1),
-            Token {
-                token_kind: TokenKind::Dot,
-                span: (13..14),
-                line_number: 1,
-            },
-            create_token_word("x", 14, 15, 1),
+            create_token_word("LINKER.x", 7, 15, 1),
         ];
 
-        assert_eq!(lexer(LINKER_SCRIPT), expected);
+        assert_eq!(expected, lexer(LINKER_SCRIPT));
     }
 
     fn create_token_number(number: u64, from: usize, to: usize, line: usize) -> Token {

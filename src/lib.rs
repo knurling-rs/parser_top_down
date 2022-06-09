@@ -376,7 +376,6 @@ MEMORY
     // hangs
     #[test]
     fn parse_expr_number_unit_3() {
-        let tokens: Vec<Token> = vec![Token::test_new(TokenKind::Word("1M".to_string()))];
         let expr = parse("MEMORY { RAM: ORIGIN = Ox1, LENGTH = 128K}");
         match &expr.commands[0] {
             Command::Memory { regions } => match &regions[0].length.expr_kind {
