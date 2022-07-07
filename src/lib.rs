@@ -1,16 +1,19 @@
 // TODO:
 // 1. Change lexer to keep number and unit together DONE
 // 2. Handle units in expression DONE
-// 3. Parse attributes (rx..)
-// 4. Error handling
-// 5. Alternative syntax origin ORG o and length...
-// 6. Sections
+// 3. Parse attributes (rx..) DONE
+// 4. Refactoring
+// 5. Error handling
+// 6. Alternative syntax origin ORG o and length...
+// 7. Sections
 
 //use std::assert_matches;
 
 use lexer::Token;
 
 use crate::lexer::TokenKind;
+
+// heap allocated string to be matched
 
 mod lexer;
 #[derive(Debug, PartialEq)]
@@ -81,28 +84,30 @@ pub fn parse(str: &str) -> LinkerScript {
     // dbg!(tokens);
     // dbg consumes the value and returns it right away for evaluation
     let mut commands = vec![];
-    if dbg!(tokens.is_empty()) {
-        LinkerScript { commands: vec![] }
-    } else {
-        // into_iter() consummes
-        let mut it = tokens.into_iter().peekable();
 
-        while let Some(t) = it.next() {
-            match t.token_kind {
-                TokenKind::Word(w) => {
-                    if w == "MEMORY" {
-                        parse_memory(&mut it, &mut commands);
-                    } else if w == "SECTIONS" {
-                        commands.push(Command::Sections)
-                    }
-                    // no need to explicit continue, as there are stuff after the match expression
+    // into_iter() consummes
+    let mut it = tokens.into_iter().peekable();
+
+    while let Some(t) = it.next() {
+        match t.token_kind {
+            TokenKind::Word(w) => {
+                // instead of heap allocated string,
+                // we match on a str slice
+                // & is &String - &*w would be a &str (string slice)
+                // &w[..] --> another way to get a string slice
+                match w.as_str() {
+                    "MEMORY" => parse_memory(&mut it, &mut commands),
+                    "SECTIONS" => commands.push(Command::Sections),
+                    _ => unreachable!("Unexpected command"),
                 }
 
-                _ => continue,
+                // no need to explicit continue, as there are stuff after the match expression
             }
+
+            _ => continue,
         }
-        LinkerScript { commands }
     }
+    LinkerScript { commands }
 }
 
 fn parse_memory(
