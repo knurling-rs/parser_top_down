@@ -39,7 +39,7 @@ impl Token {
 fn is_delimiter(c: Option<char>) -> bool {
     if let Some(c) = c {
         match c {
-            ' ' | ',' | '\n' | '}' | '{' | ':' => true,
+            ' ' | ',' | '\n' | '}' | '{' | ':' | '(' | ')' => true,
             _ => false,
         }
     } else {
@@ -103,7 +103,7 @@ pub fn lexer(script: &str) -> Vec<Token> {
             '0'..='9' => {
                 let mut from = index;
                 let radix = if let Some((_, 'x')) = it.peek() {
-                    // Consumme the "x"
+                    // Consume the "x"
                     it.next();
                     from += 2;
                     16
@@ -215,30 +215,30 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
     #[test]
-    fn lexer_1() {
+    fn empty_string() {
         let empty: Vec<Token> = Vec::new();
         assert_eq!(lexer(""), empty);
     }
 
     #[test]
-    fn lexer_1_1() {
+    fn one_space() {
         let empty: Vec<Token> = Vec::new();
         assert_eq!(lexer(" "), empty);
     }
 
     #[test]
-    fn lexer_1_2() {
+    fn multiple_spaces() {
         let empty: Vec<Token> = Vec::new();
         assert_eq!(lexer("     "), empty);
     }
 
     #[test]
-    fn lexer_1_2_with_tab() {
+    fn multiple_spaces_and_tab() {
         let empty: Vec<Token> = Vec::new();
         assert_eq!(lexer("    \t "), empty);
     }
     #[test]
-    fn lexer_2_1() {
+    fn one_zero() {
         assert_eq!(lexer("0"), vec![create_token_number(0, 0, 1, 0)]);
     }
 
@@ -273,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    fn word_with_letters_and_numbers_ends_colon() {
+    fn word_with_ram_and_colon() {
         assert_eq!(
             vec![
                 create_token_word("RAM", 0, 3, 0),
@@ -287,65 +287,65 @@ mod tests {
         );
     }
     #[test]
-    fn lexer_2_1_with_space_before() {
+    fn zero_with_space_before() {
         assert_eq!(lexer(" 0"), vec![create_token_number(0, 1, 2, 0)]);
     }
 
     #[test]
-    fn lexer_2_1_with_space_after() {
+    fn zero_with_space_after() {
         assert_eq!(lexer("0 "), vec![create_token_number(0, 0, 1, 0)]);
     }
     #[test]
-    fn lexer_2_1_with_space_after_12() {
+    fn number_with_space_after() {
         assert_eq!(lexer("12 "), vec![create_token_number(12, 0, 2, 0)]);
     }
 
     #[test]
-    fn lexer_2_1_with_space_before_after() {
+    fn zero_with_space_before_and_after() {
         assert_eq!(lexer(" 0 "), vec![create_token_number(0, 1, 2, 0)]);
     }
 
     #[test]
-    fn lexer_2_1_with_tabs() {
+    fn tab_with_space_and_zero() {
         assert_eq!(lexer("  \t  0     "), vec![create_token_number(0, 5, 6, 0)]);
     }
 
     #[test]
-    fn lexer_2_2() {
+    fn number_one() {
         assert_eq!(lexer("1"), vec![create_token_number(1, 0, 1, 0)]);
     }
 
     #[test]
-    fn lexer_2_3() {
+    fn number_twelve() {
         assert_eq!(lexer("12"), vec![create_token_number(12, 0, 2, 0)]);
     }
 
     #[test]
-    fn lexer_2_4() {
+    fn one_and_seven_zeroes() {
         assert_eq!(lexer("00000001"), vec![create_token_number(1, 0, 8, 0)]);
     }
 
     #[test]
-    fn lexer_2_5() {
+    fn zero_with_hex() {
         assert_eq!(lexer("0x0"), vec![create_token_number(0, 0, 3, 0)]);
     }
 
     #[test]
-    fn lexer_2_6() {
+    fn one_with_hex() {
         assert_eq!(lexer("0x1"), vec![create_token_number(1, 0, 3, 0)]);
     }
 
     #[test]
-    fn lexer_2_7() {
+    fn hex_23() {
         assert_eq!(lexer("0x0017"), vec![create_token_number(0x0017, 0, 6, 0)]);
     }
 
     #[test]
-    fn lexer_2_8() {
+    fn more_hex_0x0Af17() {
         assert_eq!(lexer("0x0Af17"), vec![create_token_number(0xaf17, 0, 7, 0)]);
     }
     #[test]
-    fn lexer_3() {
+    fn words_and_hex_num() {
         let three_elems: Vec<Token> = vec![
             create_token_word("nx", 0, 2, 0),
             create_token_word("nx", 3, 5, 0),
@@ -356,7 +356,7 @@ mod tests {
     }
 
     #[test]
-    fn lexer_4_1() {
+    fn empty_comment_zero() {
         let test_new_lines = "
 //
 0";
@@ -364,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn lexer_4_2() {
+    fn more_comment_zero() {
         let test_new_lines = "
 // some comment
 0";
@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn lexer_4_3() {
+    fn comments_before_and_after_zero() {
         let test_new_lines = "
 // some comment
 0
@@ -388,7 +388,7 @@ mod tests {
     }
 
     #[test]
-    fn lexer_4_4() {
+    fn very_unclear_comment() {
         let test_new_lines = "
 /*
 Very unclear comment
@@ -401,16 +401,16 @@ Very unclear comment
     }
 
     #[test]
-    fn lexer_4_5() {
+    fn comment_with_star() {
         assert_eq!(lexer("/**/"), Vec::new());
     }
     #[test]
-    fn lexer_4_6() {
+    fn comment_start() {
         assert_eq!(lexer("//"), Vec::new());
     }
 
     #[test]
-    fn lexer_5() {
+    fn number_and_unit_K() {
         let number_and_unit = "256K";
         assert_eq!(
             lexer(number_and_unit),
@@ -419,7 +419,7 @@ Very unclear comment
     }
 
     #[test]
-    fn lexer_6_1() {
+    fn two_numbers() {
         let number_and_unit = "256, 368";
         assert_eq!(
             lexer(number_and_unit),
@@ -437,7 +437,7 @@ Very unclear comment
 
     // make test as minus
     #[test]
-    fn lexer_6_2() {
+    fn numbers_and_comma() {
         let number_and_unit = "
 256
 ,
@@ -457,7 +457,7 @@ Very unclear comment
     }
 
     #[test]
-    fn lexer_7_1_1() {
+    fn phrase_on_3_lines() {
         const LINKER_SCRIPT: &str = "MEMORY
 PROBLEMS
 ";
@@ -468,8 +468,32 @@ PROBLEMS
         ];
         assert_eq!(lexer(LINKER_SCRIPT), expected);
     }
+
     #[test]
-    fn lexer_7_1() {
+    fn test_openpar_r_closepar() {
+        const LINKER_SCRIPT: &str = "(r)";
+        let expected = vec![
+            Token {
+                token_kind: TokenKind::ParOpen,
+                span: (0..1),
+                line_number: 0,
+            },
+            Token {
+                token_kind: TokenKind::Word("r".to_string()),
+                span: (1..2),
+                line_number: 0,
+            },
+            Token {
+                token_kind: TokenKind::ParClose,
+                span: (2..3),
+                line_number: 0,
+            },
+        ];
+
+        assert_eq!(expected, lexer(&LINKER_SCRIPT));
+    }
+    #[test]
+    fn memory_text() {
         const LINKER_SCRIPT: &str = "MEMORY
 {
     FLASH : ORIGIN = 0x00000000, LENGTH = 256K
@@ -518,7 +542,7 @@ PROBLEMS
     }
 
     #[test]
-    fn lexer_7_2() {
+    fn lmem_linker() {
         const LINKER_SCRIPT: &str = "MEMORY
 LINKER.x
 ";
