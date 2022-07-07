@@ -115,95 +115,92 @@ fn parse_memory(
     commands: &mut Vec<Command>,
 ) {
     assert!(it.next().unwrap().token_kind == TokenKind::CurlyOpen);
-    if has_regions(it) {
-        // MEMORY {}
-        let mut regions = Vec::new();
-        while let Some(t) = it.next() {
-            // RAM (rwx)
-            let id = match &t.token_kind {
-                TokenKind::Word(w) => w,
-                _ => unreachable!("Should not happen."),
-            };
-            let mut vec_attribute: Vec<Attribute> = vec![];
-            if let Some(par) = it.peek() {
-                if par.token_kind == TokenKind::ParOpen {
-                    // go to letters
-                    it.next();
-                    let t3 = dbg!(it.next().unwrap());
-                    assert!(matches!(dbg!(&t3.token_kind), TokenKind::Word { .. }));
-                    let a_chars = match &t3.token_kind {
-                        TokenKind::Word(w) => w.chars(),
-                        _ => unreachable!("should be one word"),
-                    };
-                    for c in a_chars {
-                        match c {
-                            c if c.to_ascii_lowercase() == 'r' => {
-                                vec_attribute.push(Attribute::Read)
-                            }
-                            c if c.to_ascii_lowercase() == 'w' => {
-                                vec_attribute.push(Attribute::Write)
-                            }
-                            c if c.to_ascii_lowercase() == 'x' => {
-                                vec_attribute.push(Attribute::Execute)
-                            }
-                            c if c.to_ascii_lowercase() == 'a' => {
-                                vec_attribute.push(Attribute::Allocatable)
-                            }
-                            c if c.to_ascii_lowercase() == 'i' => {
-                                vec_attribute.push(Attribute::Initialized)
-                            }
-                            c if c.to_ascii_lowercase() == 'l' => {
-                                vec_attribute.push(Attribute::Initialized)
-                            }
-                            c if c == '!' => vec_attribute.push(Attribute::Invert),
-                            _ => unreachable!("unacceptable variant"),
-                        }
-                    }
-                    // add the attribute vector
+    let mut regions = Vec::new();
 
-                    assert_eq!(TokenKind::ParClose, it.next().unwrap().token_kind);
-                };
-            }
-            assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
-            assert!(matches!(
-                it.next().unwrap().token_kind,
-                TokenKind::Word { .. }
-            ));
-            assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
-            let origin = parse_expr(it);
-            assert_eq!(it.next().unwrap().token_kind, TokenKind::Comma);
-            assert!(matches!(
-                it.next().unwrap().token_kind,
-                TokenKind::Word { .. }
-            ));
-            assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
-
-            let length = parse_expr(it);
-
-            let region = Region {
-                id: id.to_string(),
-                attribute: vec_attribute,
-                origin,
-                length,
-            };
-
-            regions.push(region);
-            match it.peek().unwrap().token_kind {
-                TokenKind::CurlyClose => {
-                    it.next();
-                    // no push in struct initialisation
-                }
-                _ => continue,
-            }
-        }
-
+    if !has_regions(it) {
         commands.push(Command::Memory { regions });
+        return;
+    }
+    // MEMORY {}
+    while let Some(t) = it.next() {
+        // RAM (rwx)
+        let id = match &t.token_kind {
+            TokenKind::Word(w) => w,
+            _ => unreachable!("Should not happen."),
+        };
+        let mut vec_attribute: Vec<Attribute> = vec![];
+        if let Some(par) = it.peek() {
+            if par.token_kind == TokenKind::ParOpen {
+                // go to letters
+                it.next();
+                let t3 = dbg!(it.next().unwrap());
+                assert!(matches!(dbg!(&t3.token_kind), TokenKind::Word { .. }));
+                let a_chars = match &t3.token_kind {
+                    TokenKind::Word(w) => w.chars(),
+                    _ => unreachable!("should be one word"),
+                };
+                for c in a_chars {
+                    match c {
+                        c if c.to_ascii_lowercase() == 'r' => vec_attribute.push(Attribute::Read),
+                        c if c.to_ascii_lowercase() == 'w' => vec_attribute.push(Attribute::Write),
+                        c if c.to_ascii_lowercase() == 'x' => {
+                            vec_attribute.push(Attribute::Execute)
+                        }
+                        c if c.to_ascii_lowercase() == 'a' => {
+                            vec_attribute.push(Attribute::Allocatable)
+                        }
+                        c if c.to_ascii_lowercase() == 'i' => {
+                            vec_attribute.push(Attribute::Initialized)
+                        }
+                        c if c.to_ascii_lowercase() == 'l' => {
+                            vec_attribute.push(Attribute::Initialized)
+                        }
+                        c if c == '!' => vec_attribute.push(Attribute::Invert),
+                        _ => unreachable!("unacceptable variant"),
+                    }
+                }
+                // add the attribute vector
+
+                assert_eq!(TokenKind::ParClose, it.next().unwrap().token_kind);
+            };
+        }
+        assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
+        assert!(matches!(
+            it.next().unwrap().token_kind,
+            TokenKind::Word { .. }
+        ));
+        assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
+        let origin = parse_expr(it);
+        assert_eq!(it.next().unwrap().token_kind, TokenKind::Comma);
+        assert!(matches!(
+            it.next().unwrap().token_kind,
+            TokenKind::Word { .. }
+        ));
+        assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
+
+        let length = parse_expr(it);
+
+        let region = Region {
+            id: id.to_string(),
+            attribute: vec_attribute,
+            origin,
+            length,
+        };
+
+        regions.push(region);
+        match it.peek().unwrap().token_kind {
+            TokenKind::CurlyClose => {
+                it.next();
+                // no push in struct initialisation
+            }
+            _ => continue,
+        }
 
         // skip_while consummes and it is a problem at the next while let
         // same than while let Some(t2) = it.next() {
-    } else {
-        commands.push(Command::Memory { regions: vec![] });
     }
+
+    commands.push(Command::Memory { regions });
 }
 
 fn parse_expr(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> Expr {
