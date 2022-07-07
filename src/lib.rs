@@ -171,32 +171,32 @@ fn parse_memory(it: &mut Peekable<IntoIter<Token>>, commands: &mut Vec<Command>)
 // USE replace qualified with use
 fn parse_attributes(it: &mut Peekable<IntoIter<Token>>) -> Vec<Attribute> {
     let mut attributes: Vec<Attribute> = vec![];
-    if let Some(par) = it.peek() {
-        if par.token_kind == TokenKind::ParOpen {
-            // go to letters
-            it.next();
-            let t3 = dbg!(it.next().unwrap());
-            assert!(matches!(dbg!(&t3.token_kind), TokenKind::Word { .. }));
-            let a_chars = match &t3.token_kind {
-                TokenKind::Word(w) => w.chars(),
-                _ => unreachable!("should be one word"),
-            };
-            for c in a_chars {
-                let attribute = match c {
-                    'r' | 'R' => Attribute::Read,
-                    'w' | 'W' => Attribute::Write,
-                    'x' | 'X' => Attribute::Execute,
-                    'a' | 'A' => Attribute::Allocatable,
-                    'i' | 'I' | 'l' | 'L' => Attribute::Initialized,
-                    '!' => Attribute::Invert,
-                    _ => unreachable!("unacceptable variant"),
-                };
-                attributes.push(attribute);
-            }
-            // add the attribute vector
-
-            assert_eq!(TokenKind::ParClose, it.next().unwrap().token_kind);
+    // option of a token kind, still an option
+    // map applies a function to the some variant
+    if it.peek().map(|t| &t.token_kind) == Some(&TokenKind::ParOpen) {
+        // go to letters
+        it.next();
+        let t3 = dbg!(it.next().unwrap());
+        assert!(matches!(dbg!(&t3.token_kind), TokenKind::Word { .. }));
+        let a_chars = match &t3.token_kind {
+            TokenKind::Word(w) => w.chars(),
+            _ => unreachable!("should be one word"),
         };
+        for c in a_chars {
+            let attribute = match c {
+                'r' | 'R' => Attribute::Read,
+                'w' | 'W' => Attribute::Write,
+                'x' | 'X' => Attribute::Execute,
+                'a' | 'A' => Attribute::Allocatable,
+                'i' | 'I' | 'l' | 'L' => Attribute::Initialized,
+                '!' => Attribute::Invert,
+                _ => unreachable!("unacceptable variant"),
+            };
+            attributes.push(attribute);
+
+            // add the attribute vector
+        }
+        assert_eq!(TokenKind::ParClose, it.next().unwrap().token_kind);
     }
     attributes
 }
