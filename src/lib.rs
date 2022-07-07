@@ -9,6 +9,8 @@
 
 //use std::assert_matches;
 
+use std::{iter::Peekable, vec::IntoIter};
+
 use lexer::Token;
 
 use crate::lexer::TokenKind;
@@ -72,7 +74,7 @@ enum Op {
 
 // #[derive(Debug, PartialEq)]
 // struct Sections;
-fn has_regions(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> bool {
+fn has_regions(it: &mut Peekable<IntoIter<Token>>) -> bool {
     it.peek().unwrap().token_kind != TokenKind::CurlyClose
 }
 
@@ -110,10 +112,7 @@ pub fn parse(str: &str) -> LinkerScript {
     LinkerScript { commands }
 }
 
-fn parse_memory(
-    it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>,
-    commands: &mut Vec<Command>,
-) {
+fn parse_memory(it: &mut Peekable<IntoIter<Token>>, commands: &mut Vec<Command>) {
     assert!(it.next().unwrap().token_kind == TokenKind::CurlyOpen);
     let mut regions = Vec::new();
 
@@ -128,42 +127,8 @@ fn parse_memory(
             TokenKind::Word(w) => w,
             _ => unreachable!("Should not happen."),
         };
-        let mut vec_attribute: Vec<Attribute> = vec![];
-        if let Some(par) = it.peek() {
-            if par.token_kind == TokenKind::ParOpen {
-                // go to letters
-                it.next();
-                let t3 = dbg!(it.next().unwrap());
-                assert!(matches!(dbg!(&t3.token_kind), TokenKind::Word { .. }));
-                let a_chars = match &t3.token_kind {
-                    TokenKind::Word(w) => w.chars(),
-                    _ => unreachable!("should be one word"),
-                };
-                for c in a_chars {
-                    match c {
-                        c if c.to_ascii_lowercase() == 'r' => vec_attribute.push(Attribute::Read),
-                        c if c.to_ascii_lowercase() == 'w' => vec_attribute.push(Attribute::Write),
-                        c if c.to_ascii_lowercase() == 'x' => {
-                            vec_attribute.push(Attribute::Execute)
-                        }
-                        c if c.to_ascii_lowercase() == 'a' => {
-                            vec_attribute.push(Attribute::Allocatable)
-                        }
-                        c if c.to_ascii_lowercase() == 'i' => {
-                            vec_attribute.push(Attribute::Initialized)
-                        }
-                        c if c.to_ascii_lowercase() == 'l' => {
-                            vec_attribute.push(Attribute::Initialized)
-                        }
-                        c if c == '!' => vec_attribute.push(Attribute::Invert),
-                        _ => unreachable!("unacceptable variant"),
-                    }
-                }
-                // add the attribute vector
-
-                assert_eq!(TokenKind::ParClose, it.next().unwrap().token_kind);
-            };
-        }
+        // USE extract into function!!
+        let vec_attribute = parse_attributes(it);
         assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
         assert!(matches!(
             it.next().unwrap().token_kind,
@@ -203,7 +168,46 @@ fn parse_memory(
     commands.push(Command::Memory { regions });
 }
 
-fn parse_expr(it: &mut std::iter::Peekable<std::vec::IntoIter<Token>>) -> Expr {
+// USE replace qualified with use
+fn parse_attributes(it: &mut Peekable<IntoIter<Token>>) -> Vec<Attribute> {
+    let mut vec_attribute: Vec<Attribute> = vec![];
+    if let Some(par) = it.peek() {
+        if par.token_kind == TokenKind::ParOpen {
+            // go to letters
+            it.next();
+            let t3 = dbg!(it.next().unwrap());
+            assert!(matches!(dbg!(&t3.token_kind), TokenKind::Word { .. }));
+            let a_chars = match &t3.token_kind {
+                TokenKind::Word(w) => w.chars(),
+                _ => unreachable!("should be one word"),
+            };
+            for c in a_chars {
+                match c {
+                    c if c.to_ascii_lowercase() == 'r' => vec_attribute.push(Attribute::Read),
+                    c if c.to_ascii_lowercase() == 'w' => vec_attribute.push(Attribute::Write),
+                    c if c.to_ascii_lowercase() == 'x' => vec_attribute.push(Attribute::Execute),
+                    c if c.to_ascii_lowercase() == 'a' => {
+                        vec_attribute.push(Attribute::Allocatable)
+                    }
+                    c if c.to_ascii_lowercase() == 'i' => {
+                        vec_attribute.push(Attribute::Initialized)
+                    }
+                    c if c.to_ascii_lowercase() == 'l' => {
+                        vec_attribute.push(Attribute::Initialized)
+                    }
+                    c if c == '!' => vec_attribute.push(Attribute::Invert),
+                    _ => unreachable!("unacceptable variant"),
+                }
+            }
+            // add the attribute vector
+
+            assert_eq!(TokenKind::ParClose, it.next().unwrap().token_kind);
+        };
+    }
+    vec_attribute
+}
+
+fn parse_expr(it: &mut Peekable<IntoIter<Token>>) -> Expr {
     // assert!(matches!(
     //     it.peek().unwrap().token_kind,
     //     TokenKind::Number { .. }
