@@ -170,7 +170,7 @@ fn parse_memory(it: &mut Peekable<IntoIter<Token>>, commands: &mut Vec<Command>)
 
 // USE replace qualified with use
 fn parse_attributes(it: &mut Peekable<IntoIter<Token>>) -> Vec<Attribute> {
-    let mut vec_attribute: Vec<Attribute> = vec![];
+    let mut attributes: Vec<Attribute> = vec![];
     if let Some(par) = it.peek() {
         if par.token_kind == TokenKind::ParOpen {
             // go to letters
@@ -182,29 +182,23 @@ fn parse_attributes(it: &mut Peekable<IntoIter<Token>>) -> Vec<Attribute> {
                 _ => unreachable!("should be one word"),
             };
             for c in a_chars {
-                match c {
-                    c if c.to_ascii_lowercase() == 'r' => vec_attribute.push(Attribute::Read),
-                    c if c.to_ascii_lowercase() == 'w' => vec_attribute.push(Attribute::Write),
-                    c if c.to_ascii_lowercase() == 'x' => vec_attribute.push(Attribute::Execute),
-                    c if c.to_ascii_lowercase() == 'a' => {
-                        vec_attribute.push(Attribute::Allocatable)
-                    }
-                    c if c.to_ascii_lowercase() == 'i' => {
-                        vec_attribute.push(Attribute::Initialized)
-                    }
-                    c if c.to_ascii_lowercase() == 'l' => {
-                        vec_attribute.push(Attribute::Initialized)
-                    }
-                    c if c == '!' => vec_attribute.push(Attribute::Invert),
+                let attribute = match c {
+                    'r' | 'R' => Attribute::Read,
+                    'w' | 'W' => Attribute::Write,
+                    'x' | 'X' => Attribute::Execute,
+                    'a' | 'A' => Attribute::Allocatable,
+                    'i' | 'I' | 'l' | 'L' => Attribute::Initialized,
+                    '!' => Attribute::Invert,
                     _ => unreachable!("unacceptable variant"),
-                }
+                };
+                attributes.push(attribute);
             }
             // add the attribute vector
 
             assert_eq!(TokenKind::ParClose, it.next().unwrap().token_kind);
         };
     }
-    vec_attribute
+    attributes
 }
 
 fn parse_expr(it: &mut Peekable<IntoIter<Token>>) -> Expr {
