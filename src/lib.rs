@@ -97,11 +97,13 @@ pub fn parse(str: &str) -> LinkerScript {
                 // we match on a str slice
                 // & is &String - &*w would be a &str (string slice)
                 // &w[..] --> another way to get a string slice
-                match w.as_str() {
-                    "MEMORY" => parse_memory(&mut it, &mut commands),
-                    "SECTIONS" => commands.push(Command::Sections),
+                let command = match w.as_str() {
+                    "MEMORY" => parse_memory(&mut it),
+                    "SECTIONS" => Command::Sections,
                     _ => unreachable!("Unexpected command"),
-                }
+                };
+
+                commands.push(command);
                 // no need to explicit continue, as there are stuff after the match expression
             }
             _ => continue,
@@ -110,13 +112,12 @@ pub fn parse(str: &str) -> LinkerScript {
     LinkerScript { commands }
 }
 
-fn parse_memory(it: &mut Peekable<IntoIter<Token>>, commands: &mut Vec<Command>) {
+fn parse_memory(it: &mut Peekable<IntoIter<Token>>) -> Command {
     assert!(it.next().unwrap().token_kind == TokenKind::CurlyOpen);
     let mut regions = Vec::new();
 
     if !has_regions(it) {
-        commands.push(Command::Memory { regions });
-        return;
+        return Command::Memory { regions };
     }
 
     // MEMORY {}
@@ -138,7 +139,7 @@ fn parse_memory(it: &mut Peekable<IntoIter<Token>>, commands: &mut Vec<Command>)
         // same than while let Some(t2) = it.next() {
     }
 
-    commands.push(Command::Memory { regions });
+    Command::Memory { regions }
 }
 
 fn parse_region(t: Token, it: &mut Peekable<IntoIter<Token>>) -> Region {
