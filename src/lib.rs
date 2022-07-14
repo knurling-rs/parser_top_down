@@ -9,7 +9,7 @@
 
 //use std::assert_matches;
 
-use std::{iter::Peekable, vec::IntoIter};
+use std::{iter::Peekable, ops::ControlFlow, vec::IntoIter};
 
 use lexer::Token;
 
@@ -102,10 +102,8 @@ pub fn parse(str: &str) -> LinkerScript {
                     "SECTIONS" => commands.push(Command::Sections),
                     _ => unreachable!("Unexpected command"),
                 }
-
                 // no need to explicit continue, as there are stuff after the match expression
             }
-
             _ => continue,
         }
     }
@@ -120,45 +118,20 @@ fn parse_memory(it: &mut Peekable<IntoIter<Token>>, commands: &mut Vec<Command>)
         commands.push(Command::Memory { regions });
         return;
     }
+
     // MEMORY {}
     while let Some(t) = it.next() {
-        // RAM (rwx)
-        let id = match &t.token_kind {
-            TokenKind::Word(w) => w,
-            _ => unreachable!("Should not happen."),
-        };
-        // USE extract into function!!
-        let vec_attribute = parse_attributes(it);
-        assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
-        assert!(matches!(
-            it.next().unwrap().token_kind,
-            TokenKind::Word { .. }
-        ));
-        assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
-        let origin = parse_expr(it);
-        assert_eq!(it.next().unwrap().token_kind, TokenKind::Comma);
-        assert!(matches!(
-            it.next().unwrap().token_kind,
-            TokenKind::Word { .. }
-        ));
-        assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
-
-        let length = parse_expr(it);
-
-        let region = Region {
-            id: id.to_string(),
-            attribute: vec_attribute,
-            origin,
-            length,
-        };
-
+        let region = parse_region(t, it);
         regions.push(region);
-        match it.peek().unwrap().token_kind {
-            TokenKind::CurlyClose => {
-                it.next();
-                // no push in struct initialisation
-            }
-            _ => continue,
+
+        // if let TokenKind::CurlyClose = it.peek().unwrap().token_kind {
+        //     it.next();
+        //     break;
+        // }
+
+        if matches!(it.peek().unwrap().token_kind, TokenKind::CurlyClose) {
+            it.next();
+            break;
         }
 
         // skip_while consummes and it is a problem at the next while let
@@ -166,6 +139,35 @@ fn parse_memory(it: &mut Peekable<IntoIter<Token>>, commands: &mut Vec<Command>)
     }
 
     commands.push(Command::Memory { regions });
+}
+
+fn parse_region(t: Token, it: &mut Peekable<IntoIter<Token>>) -> Region {
+    let id = match &t.token_kind {
+        TokenKind::Word(w) => w,
+        _ => unreachable!("Should not happen."),
+    };
+    let vec_attribute = parse_attributes(it);
+    assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
+    assert!(matches!(
+        it.next().unwrap().token_kind,
+        TokenKind::Word { .. }
+    ));
+    assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
+    let origin = parse_expr(it);
+    assert_eq!(it.next().unwrap().token_kind, TokenKind::Comma);
+    assert!(matches!(
+        it.next().unwrap().token_kind,
+        TokenKind::Word { .. }
+    ));
+    assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
+    let length = parse_expr(it);
+
+    Region {
+        id: id.to_string(),
+        attribute: vec_attribute,
+        origin,
+        length,
+    }
 }
 
 // USE replace qualified with use
@@ -251,7 +253,6 @@ fn parse_expr(it: &mut Peekable<IntoIter<Token>>) -> Expr {
 //tmod expands!!
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use pretty_assertions::assert_eq;
 
