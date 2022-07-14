@@ -9,7 +9,7 @@
 
 //use std::assert_matches;
 
-use std::{iter::Peekable, ops::ControlFlow, vec::IntoIter};
+use std::{iter::Peekable, vec::IntoIter};
 
 use lexer::Token;
 
