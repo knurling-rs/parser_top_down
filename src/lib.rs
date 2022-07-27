@@ -330,6 +330,13 @@ mod tests {
         }
     }
 
+    // #[test]
+    // fn error_on_semi_colon() {
+    //     let ls = parse("MEMORY { RAM; ORIGIN = 1, LENGTH = 2 }");
+
+    //     assert!(matches!(ls, Err(Error::UnexpectedToken)));
+    // }
+
     #[test]
     fn memory_ram_with_comma_and_white_space() {
         let ls = parse("MEMORY { RAM: ORIGIN = 1 , LENGTH = 2 }").unwrap();

@@ -16,6 +16,7 @@ pub enum TokenKind {
     Plus,
     Minus,
     Colon,
+    SemiColon,
     CurlyClose,
     CurlyOpen,
     Equal,
@@ -39,7 +40,7 @@ impl Token {
 fn is_delimiter(c: Option<char>) -> bool {
     if let Some(c) = c {
         match c {
-            ' ' | ',' | '\n' | '}' | '{' | ':' | '(' | ')' => true,
+            ' ' | ',' | '\n' | '}' | '{' | ':' | '(' | ')' | ';' => true,
             _ => false,
         }
     } else {
@@ -74,6 +75,7 @@ pub fn lexer(script: &str) -> Vec<Token> {
             '(' => push_char(TokenKind::ParOpen),
             ')' => push_char(TokenKind::ParClose),
             '.' => push_char(TokenKind::Dot),
+            ';' => push_char(TokenKind::SemiColon),
             ' ' | '\t' | '\r' => {
                 // nothing to do with whitespaces atm
                 // if we implement start and stop positions
@@ -269,6 +271,56 @@ mod tests {
                 }
             ],
             lexer("a0a,")
+        );
+    }
+
+    #[test]
+    fn semicolon() {
+        assert_eq!(
+            vec![Token {
+                token_kind: TokenKind::SemiColon,
+                span: 0..1,
+                line_number: 0
+            }],
+            lexer(";")
+        );
+    }
+
+    #[test]
+    fn semicolon_and_origin() {
+        assert_eq!(
+            vec![
+                Token {
+                    token_kind: TokenKind::Word("ORIGIN".to_string()),
+                    span: 0..6,
+                    line_number: 0
+                },
+                Token {
+                    token_kind: TokenKind::SemiColon,
+                    span: 6..7,
+                    line_number: 0
+                }
+            ],
+            lexer("ORIGIN;")
+        );
+    }
+
+    #[test]
+    fn semicolon_and_number() {
+        assert_eq!(
+            vec![
+                Token {
+                    token_kind: TokenKind::Number(0),
+                    span: 0..1,
+                    line_number: 0
+                },
+                Token {
+                    token_kind: TokenKind::SemiColon,
+                    span: 1..2,
+                    line_number: 0
+                }
+            ],
+            lexer("0;")
         );
     }
 
