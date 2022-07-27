@@ -2,7 +2,7 @@
 // 1. Change lexer to keep number and unit together DONE
 // 2. Handle units in expression DONE
 // 3. Parse attributes (rx..) DONE
-// 4. Refactoring
+// 4. Refactoring DONE [x]
 // 5. Error handling
 // 6. Alternative syntax origin ORG o and length...
 // 7. Sections
@@ -63,7 +63,10 @@ enum Unit {
     K,
     M,
 }
-
+#[derive(Debug, PartialEq)]
+pub enum Error {
+    UnmatchingBrace,
+}
 #[derive(Debug, PartialEq)]
 enum Op {
     Plus,
@@ -74,11 +77,10 @@ enum Op {
 
 // #[derive(Debug, PartialEq)]
 // struct Sections;
-fn has_regions(it: &mut Peekable<IntoIter<Token>>) -> bool {
-    it.peek().unwrap().token_kind != TokenKind::CurlyClose
-}
 
-pub fn parse(str: &str) -> LinkerScript {
+// Type name is name of enum
+// parse explicitely pub so all types need explicit pub
+pub fn parse(str: &str) -> Result<LinkerScript, Error> {
     let tokens = lexer::lexer(str);
     // println!("Printing tokens {:#?}", tokens);
 
@@ -98,7 +100,10 @@ pub fn parse(str: &str) -> LinkerScript {
                 // & is &String - &*w would be a &str (string slice)
                 // &w[..] --> another way to get a string slice
                 let command = match w.as_str() {
-                    "MEMORY" => parse_memory(&mut it),
+                    "MEMORY" => match parse_memory(&mut it) {
+                        Ok(mem) => mem,
+                        Err(e) => return Err(e),
+                    },
                     "SECTIONS" => Command::Sections,
                     _ => unreachable!("Unexpected command"),
                 };
@@ -109,15 +114,20 @@ pub fn parse(str: &str) -> LinkerScript {
             _ => continue,
         }
     }
-    LinkerScript { commands }
+    Ok(LinkerScript { commands })
 }
 
-fn parse_memory(it: &mut Peekable<IntoIter<Token>>) -> Command {
+fn parse_memory(it: &mut Peekable<IntoIter<Token>>) -> Result<Command, Error> {
     assert!(it.next().unwrap().token_kind == TokenKind::CurlyOpen);
     let mut regions = Vec::new();
 
-    if !has_regions(it) {
-        return Command::Memory { regions };
+    match it.peek() {
+        Some(token) => {
+            if token.token_kind == TokenKind::CurlyClose {
+                return Ok(Command::Memory { regions });
+            }
+        }
+        None => return Err(Error::UnmatchingBrace),
     }
 
     // MEMORY {}
@@ -139,7 +149,7 @@ fn parse_memory(it: &mut Peekable<IntoIter<Token>>) -> Command {
         // same than while let Some(t2) = it.next() {
     }
 
-    Command::Memory { regions }
+    Ok(Command::Memory { regions })
 }
 
 fn parse_region(t: Token, it: &mut Peekable<IntoIter<Token>>) -> Region {
@@ -259,20 +269,26 @@ mod tests {
 
     #[test]
     fn empty_string() {
-        let ls = parse("");
+        let ls = parse("").unwrap();
         assert!(ls.commands.is_empty());
     }
 
     #[test]
     fn memory_string() {
-        let ls = parse("MEMORY {}");
+        let ls = parse("MEMORY {}").unwrap();
         assert_eq!(ls.commands.len(), 1);
         assert!(matches!(ls.commands[0], Command::Memory { .. }));
     }
 
     #[test]
+    fn memory_string_without_closing() {
+        let ls_res = parse("MEMORY {");
+        assert!(matches!(ls_res, Err(Error::UnmatchingBrace)));
+    }
+
+    #[test]
     fn two_memory_word_string() {
-        let linker_script = parse("MEMORY {} MEMORY {}");
+        let linker_script = parse("MEMORY {} MEMORY {}").unwrap();
         assert_eq!(linker_script.commands.len(), 2);
         // field of enum variant ==> ..
         assert!(matches!(linker_script.commands[0], Command::Memory { .. }));
@@ -281,7 +297,7 @@ mod tests {
 
     #[test]
     fn section_string() {
-        let linker_script = parse("SECTIONS {}");
+        let linker_script = parse("SECTIONS {}").unwrap();
         assert_eq!(linker_script.commands.len(), 1);
         assert!(matches!(
             linker_script.commands[0],
@@ -291,7 +307,7 @@ mod tests {
 
     #[test]
     fn memory_ram() {
-        let ls = parse("MEMORY { RAM: ORIGIN = 1, LENGTH = 2 }");
+        let ls = parse("MEMORY { RAM: ORIGIN = 1, LENGTH = 2 }").unwrap();
         assert_eq!(ls.commands.len(), 1);
 
         match &ls.commands[0] {
@@ -302,7 +318,7 @@ mod tests {
 
     #[test]
     fn memory_ram_with_comma_and_white_space() {
-        let ls = parse("MEMORY { RAM: ORIGIN = 1 , LENGTH = 2 }");
+        let ls = parse("MEMORY { RAM: ORIGIN = 1 , LENGTH = 2 }").unwrap();
         assert_eq!(ls.commands.len(), 1);
 
         match &ls.commands[0] {
@@ -321,7 +337,8 @@ MEMORY
     RAM:   ORIGIN = 3, LENGTH = 4 
 }
 ",
-        );
+        )
+        .unwrap();
         assert_eq!(ls.commands.len(), 1);
 
         match ls.commands[0] {
@@ -346,7 +363,8 @@ MEMORY
     FLASH:   ORIGIN = 3, LENGTH = 4 
 }
 ",
-        );
+        )
+        .unwrap();
         assert_eq!(1, ls.commands.len());
 
         match ls.commands[0] {
@@ -424,7 +442,7 @@ MEMORY
 
     #[test]
     fn parse_expr_number_unit_3() {
-        let expr = parse("MEMORY { RAM: ORIGIN = 0x1, LENGTH = 128K}");
+        let expr = parse("MEMORY { RAM: ORIGIN = 0x1, LENGTH = 128K}").unwrap();
         match &expr.commands[0] {
             Command::Memory { regions } => match &regions[0].length.expr_kind {
                 ExprKind::NumberUnit(n, u) => {
@@ -513,7 +531,7 @@ MEMORY
 
     #[test]
     fn memory_ram_r() {
-        let expr = parse("MEMORY { RAM (r): ORIGIN = 0, LENGTH = 0}");
+        let expr = parse("MEMORY { RAM (r): ORIGIN = 0, LENGTH = 0}").unwrap();
         match &expr.commands[0] {
             Command::Memory { regions: r } => {
                 assert_eq!(1, r[0].attribute.len());
@@ -525,7 +543,7 @@ MEMORY
 
     #[test]
     fn memory_ram_rwx() {
-        let expr = parse("MEMORY { RAM (rwx): ORIGIN = 0, LENGTH = 0}");
+        let expr = parse("MEMORY { RAM (rwx): ORIGIN = 0, LENGTH = 0}").unwrap();
         match &expr.commands[0] {
             Command::Memory { regions: r } => {
                 assert_eq!(3, r[0].attribute.len());
