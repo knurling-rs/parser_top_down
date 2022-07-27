@@ -66,6 +66,7 @@ enum Unit {
 #[derive(Debug, PartialEq)]
 pub enum Error {
     UnmatchingBrace,
+    UnexpectedToken,
 }
 #[derive(Debug, PartialEq)]
 enum Op {
@@ -99,11 +100,18 @@ pub fn parse(str: &str) -> Result<LinkerScript, Error> {
                 // we match on a str slice
                 // & is &String - &*w would be a &str (string slice)
                 // &w[..] --> another way to get a string slice
+
+                // let command = match w.as_str() {
+                //     "MEMORY" => match parse_memory(&mut it) {
+                //         Ok(mem) => mem,
+                //         // early return
+                //         Err(e) => return Err(e),
+                //     },
+                // ====>
+                // changing control flow is ^^ not typed checked ^^
+
                 let command = match w.as_str() {
-                    "MEMORY" => match parse_memory(&mut it) {
-                        Ok(mem) => mem,
-                        Err(e) => return Err(e),
-                    },
+                    "MEMORY" => parse_memory(&mut it)?,
                     "SECTIONS" => Command::Sections,
                     _ => unreachable!("Unexpected command"),
                 };
@@ -132,7 +140,7 @@ fn parse_memory(it: &mut Peekable<IntoIter<Token>>) -> Result<Command, Error> {
 
     // MEMORY {}
     while let Some(t) = it.next() {
-        let region = parse_region(t, it);
+        let region = parse_region(t, it)?;
         regions.push(region);
 
         // if let TokenKind::CurlyClose = it.peek().unwrap().token_kind {
@@ -152,10 +160,10 @@ fn parse_memory(it: &mut Peekable<IntoIter<Token>>) -> Result<Command, Error> {
     Ok(Command::Memory { regions })
 }
 
-fn parse_region(t: Token, it: &mut Peekable<IntoIter<Token>>) -> Region {
+fn parse_region(t: Token, it: &mut Peekable<IntoIter<Token>>) -> Result<Region, Error> {
     let id = match &t.token_kind {
         TokenKind::Word(w) => w,
-        _ => unreachable!("Should not happen."),
+        _ => return Err(Error::UnexpectedToken),
     };
     let vec_attribute = parse_attributes(it);
     assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
@@ -173,12 +181,12 @@ fn parse_region(t: Token, it: &mut Peekable<IntoIter<Token>>) -> Region {
     assert_eq!(it.next().unwrap().token_kind, TokenKind::Equal);
     let length = parse_expr(it);
 
-    Region {
+    Ok(Region {
         id: id.to_string(),
         attribute: vec_attribute,
         origin,
         length,
-    }
+    })
 }
 
 // USE replace qualified with use
@@ -284,6 +292,12 @@ mod tests {
     fn memory_string_without_closing() {
         let ls_res = parse("MEMORY {");
         assert!(matches!(ls_res, Err(Error::UnmatchingBrace)));
+    }
+
+    #[test]
+    fn memory_string_double_opening() {
+        let ls_res = parse("MEMORY {{");
+        assert!(matches!(ls_res, Err(Error::UnexpectedToken)));
     }
 
     #[test]
