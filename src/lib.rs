@@ -67,6 +67,7 @@ enum Unit {
 pub enum Error {
     UnmatchingBrace,
     UnexpectedToken,
+    UnexpectedEoF,
 }
 #[derive(Debug, PartialEq)]
 enum Op {
@@ -166,7 +167,16 @@ fn parse_region(t: Token, it: &mut Peekable<IntoIter<Token>>) -> Result<Region, 
         _ => return Err(Error::UnexpectedToken),
     };
     let vec_attribute = parse_attributes(it);
-    assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
+    match it.next() {
+        Some(t) => {
+            if t.token_kind != TokenKind::Colon {
+                return Err(Error::UnexpectedToken);
+                // when no other branch, evaluates to ()
+            }
+        }
+        None => return Err(Error::UnexpectedEoF),
+    }
+    //assert_eq!(it.next().unwrap().token_kind, TokenKind::Colon);
     assert!(matches!(
         it.next().unwrap().token_kind,
         TokenKind::Word { .. }
@@ -330,12 +340,19 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn error_on_semi_colon() {
-    //     let ls = parse("MEMORY { RAM; ORIGIN = 1, LENGTH = 2 }");
+    #[test]
+    fn error_on_semi_colon() {
+        let ls = parse("MEMORY { RAM; ORIGIN = 1, LENGTH = 2 }");
 
-    //     assert!(matches!(ls, Err(Error::UnexpectedToken)));
-    // }
+        assert!(matches!(ls, Err(Error::UnexpectedToken)));
+    }
+
+    #[test]
+    fn error_on_unexpected_eof() {
+        let ls = parse("MEMORY { RAM");
+
+        assert!(matches!(ls, Err(Error::UnexpectedEoF)));
+    }
 
     #[test]
     fn memory_ram_with_comma_and_white_space() {
